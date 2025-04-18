@@ -5,9 +5,10 @@ import time
 import requests
 import shutil
 import subprocess
-import openai
+from openai import OpenAI
 
-openai.api_key = "YOUR_OPENAI_API_KEY_HERE"  # <-- Bu yerga API kalitingizni kiriting
+
+client = OpenAI(api_key="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")  # <-- Bu yerga API kalitingizni kiriting
 
 class SelfImprovingAgentApp:
     def __init__(self, root):
@@ -171,7 +172,7 @@ class SelfImprovingAgentApp:
     def fetch_and_replace_code(self, url):
         try:
             response = requests.get(url)
-            with open(__file__, 'w', encoding='utf-8') as f:
+            with open(__file__, ' 'w', encoding='utf-8') as f:
                 f.write(response.text)
             self.log("✅ Kod yangilandi. Dastur qayta ishga tushirilishi kerak.")
             self.log_action("SELF_UPDATE", True)
@@ -186,11 +187,11 @@ class SelfImprovingAgentApp:
             return
         self.log("🧠 ChatGPT bilan aloqa o‘rnatilmoqda...")
         try:
-            response = openai.ChatCompletion.create(
+            response = client.chat.completions.create(
                 model="gpt-4",
                 messages=[{"role": "user", "content": prompt}]
             )
-            content = response['choices'][0]['message']['content']
+            content = response.choices[0].message.content
             self.gpt_code_area.delete("1.0", tk.END)
             self.gpt_code_area.insert(tk.END, content)
             self.log("✅ ChatGPT'dan javob olindi.")
@@ -218,11 +219,11 @@ class SelfImprovingAgentApp:
             code = f.read()
         prompt = f"Iltimos, quyidagi Python kodni tahlil qilib xatoliklarni tuzating va yangilangan kodni qaytaring:\n\n{code}"
         try:
-            response = openai.ChatCompletion.create(
+            response = client.chat.completions.create(
                 model="gpt-4",
                 messages=[{"role": "user", "content": prompt}]
             )
-            fixed = response['choices'][0]['message']['content']
+            fixed = response.choices[0].message.content
             self.fixed_code_area.delete("1.0", tk.END)
             self.fixed_code_area.insert(tk.END, fixed)
             self.log("🧰 Tuzatilgan kod tayyor.")
