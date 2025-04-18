@@ -1,10 +1,13 @@
 import os
 import tkinter as tk
-from tkinter import scrolledtext
+from tkinter import scrolledtext, messagebox
 import time
 import requests
 import shutil
 import subprocess
+import openai
+
+openai.api_key = "YOUR_OPENAI_API_KEY_HERE"  # <-- Bu yerga API kalitingizni kiriting
 
 class SelfImprovingAgentApp:
     def __init__(self, root):
@@ -29,8 +32,44 @@ class SelfImprovingAgentApp:
         self.deny_button.pack(side=tk.LEFT, padx=5)
 
         # Loglar oynasi
-        self.log_area = scrolledtext.ScrolledText(root, height=12, width=70)
+        self.log_area = scrolledtext.ScrolledText(root, height=10, width=70)
         self.log_area.pack(pady=10)
+
+        # ChatGPT agent taklifi oynasi
+        self.gpt_frame = tk.LabelFrame(root, text="💬 ChatGPT Taklifi")
+        self.gpt_frame.pack(fill="both", expand="yes", padx=10, pady=5)
+
+        self.gpt_input = tk.Text(self.gpt_frame, height=3, width=60)
+        self.gpt_input.pack(padx=5, pady=5)
+
+        self.gpt_send = tk.Button(self.gpt_frame, text="➤ So'rov yuborish", command=self.ask_chatgpt)
+        self.gpt_send.pack(pady=5)
+
+        self.gpt_code_area = scrolledtext.ScrolledText(self.gpt_frame, height=10, width=70)
+        self.gpt_code_area.pack(pady=5)
+
+        self.insert_code_btn = tk.Button(self.gpt_frame, text="✅ Kodni joylashtirish", command=self.insert_gpt_code)
+        self.insert_code_btn.pack(pady=5)
+
+        # AutoFix paneli
+        self.fix_frame = tk.LabelFrame(root, text="🔧 AutoFix (Kod tuzatish)")
+        self.fix_frame.pack(fill="both", expand="yes", padx=10, pady=5)
+
+        self.fix_target_label = tk.Label(self.fix_frame, text="Tuzatiladigan fayl nomi (masalan, agent.py):")
+        self.fix_target_label.pack()
+
+        self.fix_target_entry = tk.Entry(self.fix_frame, width=50)
+        self.fix_target_entry.insert(0, "gpt_module.py")
+        self.fix_target_entry.pack(padx=5, pady=5)
+
+        self.fix_button = tk.Button(self.fix_frame, text="🔍 AutoFix so‘rovi yuborish", command=self.analyze_and_fix)
+        self.fix_button.pack(pady=5)
+
+        self.apply_fix_button = tk.Button(self.fix_frame, text="✅ Tuzatmani qabul qilish", command=self.insert_fixed_code)
+        self.apply_fix_button.pack(pady=5)
+
+        self.fixed_code_area = scrolledtext.ScrolledText(self.fix_frame, height=10, width=70)
+        self.fixed_code_area.pack(pady=5)
 
         # Tahlil navbati
         self.analysis_steps = [
@@ -126,7 +165,7 @@ class SelfImprovingAgentApp:
 
     def suggest_code_update(self):
         proposal = "Kodni GitHub'dan yangilashga ruxsat berasizmi?"
-        url = "https://raw.githubusercontent.com/AsliddinAbdimuminov/ZEAS_AI/refs/heads/main/main.py"  # bu yerga haqiqiy linkni yozing
+        url = "https://raw.githubusercontent.com/username/repo/main/agent.py"
         return proposal, lambda: self.fetch_and_replace_code(url)
 
     def fetch_and_replace_code(self, url):
@@ -139,6 +178,72 @@ class SelfImprovingAgentApp:
         except Exception as e:
             self.log(f"❌ Yangilashda xatolik: {e}")
             self.log_action("SELF_UPDATE", False)
+
+    def ask_chatgpt(self):
+        prompt = self.gpt_input.get("1.0", tk.END).strip()
+        if not prompt:
+            self.log("⚠️ So‘rov bo‘sh.")
+            return
+        self.log("🧠 ChatGPT bilan aloqa o‘rnatilmoqda...")
+        try:
+            response = openai.ChatCompletion.create(
+                model="gpt-4",
+                messages=[{"role": "user", "content": prompt}]
+            )
+            content = response['choices'][0]['message']['content']
+            self.gpt_code_area.delete("1.0", tk.END)
+            self.gpt_code_area.insert(tk.END, content)
+            self.log("✅ ChatGPT'dan javob olindi.")
+        except Exception as e:
+            self.log(f"❌ ChatGPT xatosi: {e}")
+
+    def insert_gpt_code(self):
+        new_code = self.gpt_code_area.get("1.0", tk.END).strip()
+        if not new_code:
+            self.log("⚠️ Kod mavjud emas.")
+            return
+        file_path = "gpt_module.py"
+        with open(file_path, 'w', encoding='utf-8') as f:
+            f.write("""# ==== GPT tomonidan taklif qilingan kod ====\n""" + new_code + "\n# ==== /GPT kod yakuni ====\n")
+        self.log(f"✅ Kod '{file_path}' fayliga saqlandi.")
+        messagebox.showinfo("Kodni qo‘shish", f"Yangi kod '{file_path}' faylida saqlandi. Qo‘lda chaqirilishi mumkin.")
+        self.log_action("GPT_CODE_INSERTED", True)
+
+    def analyze_and_fix(self):
+        file_name = self.fix_target_entry.get().strip()
+        if not os.path.isfile(file_name):
+            self.log("❌ Fayl topilmadi.")
+            return
+        with open(file_name, 'r', encoding='utf-8') as f:
+            code = f.read()
+        prompt = f"Iltimos, quyidagi Python kodni tahlil qilib xatoliklarni tuzating va yangilangan kodni qaytaring:\n\n{code}"
+        try:
+            response = openai.ChatCompletion.create(
+                model="gpt-4",
+                messages=[{"role": "user", "content": prompt}]
+            )
+            fixed = response['choices'][0]['message']['content']
+            self.fixed_code_area.delete("1.0", tk.END)
+            self.fixed_code_area.insert(tk.END, fixed)
+            self.log("🧰 Tuzatilgan kod tayyor.")
+        except Exception as e:
+            self.log(f"❌ AutoFix xatosi: {e}")
+
+    def insert_fixed_code(self):
+        file_name = self.fix_target_entry.get().strip()
+        fixed_code = self.fixed_code_area.get("1.0", tk.END).strip()
+        if not fixed_code:
+            self.log("⚠️ Tuzatmani kiritish uchun kod yo'q.")
+            return
+        try:
+            shutil.copy2(file_name, file_name + ".bak")
+            with open(file_name, 'w', encoding='utf-8') as f:
+                f.write(fixed_code)
+            self.log(f"✅ '{file_name}' yangilandi. '.bak' nusxa saqlandi.")
+            self.log_action("AUTOFIX_APPLIED", True)
+        except Exception as e:
+            self.log(f"❌ Faylni yangilashda xatolik: {e}")
+            self.log_action("AUTOFIX_FAILED", False)
 
     def approve_action(self):
         self.log("✅ Ruxsat berildi. Agent harakatni bajaryapti...")
