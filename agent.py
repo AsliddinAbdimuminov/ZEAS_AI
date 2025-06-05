@@ -172,7 +172,7 @@ class SelfImprovingAgentApp:
     def fetch_and_replace_code(self, url):
         try:
             response = requests.get(url)
-            with open(__file__, ' 'w', encoding='utf-8') as f:
+            with open(__file__, 'w', encoding='utf-8') as f:
                 f.write(response.text)
             self.log("✅ Kod yangilandi. Dastur qayta ishga tushirilishi kerak.")
             self.log_action("SELF_UPDATE", True)
